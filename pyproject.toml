@@ -1,0 +1,21 @@
+[tool.poetry]
+name = "DevRewind"
+version = "0.1.0"
+description = ""
+authors = ["williamfzc <williamfzc@foxmail.com>"]
+license = "Apache-2.0"
+readme = "README.md"
+packages = [
+    {include = "dev_rewind"}
+]
+
+[tool.poetry.dependencies]
+python = "^3.7"
+
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^7.4.2"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

@@ -1,0 +1,2 @@
+class DevRewindException(BaseException):
+    pass

@@ -11,6 +11,9 @@ packages = [
 
 [tool.poetry.dependencies]
 python = "^3.7"
+pydantic = "^2.4.2"
+gitpython = "^3.1.38"
+loguru = "^0.7.2"
 
 
 [tool.poetry.group.dev.dependencies]

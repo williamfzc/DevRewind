@@ -2,10 +2,12 @@ import typing
 
 import git
 from git import Commit, Repo
+from langchain.schema import Document
 from pydantic import BaseModel
 from loguru import logger
 
-from dev_rewind.context import RuntimeContext
+from dev_rewind.context import RuntimeContext, FileContext
+from dev_rewind.creator import Creator
 from dev_rewind.exc import DevRewindException
 
 
@@ -20,7 +22,7 @@ class DevRewind(object):
             config = DevRewindConfig()
         self.config = config
 
-    def rewind(self):
+    def collect_metadata(self) -> RuntimeContext:
         exc = self._check_env()
         if exc:
             raise DevRewindException() from exc
@@ -30,7 +32,18 @@ class DevRewind(object):
         ctx = RuntimeContext()
         self._collect_files(ctx)
         self._collect_histories(ctx)
+
         logger.debug("building documentations ...")
+        self._create_docs(ctx)
+        return ctx
+
+    def collect_documents(self) -> typing.List[Document]:
+        docs = []
+        ctx = self.collect_metadata()
+        for each_file in ctx.files.values():
+            for each_doc in each_file.documents:
+                docs.append(each_doc)
+        return docs
 
     def _check_env(self) -> typing.Optional[BaseException]:
         try:
@@ -44,7 +57,7 @@ class DevRewind(object):
         git_repo = git.Repo(self.config.repo_root)
         git_track_files = set([each[1].path for each in git_repo.index.iter_blobs()])
         for each in git_track_files:
-            ctx.files[each] = []
+            ctx.files[each] = FileContext(each)
         logger.debug(f"file {len(ctx.files)} collected")
 
     def _collect_history(self, repo: Repo, file_path: str) -> typing.List[Commit]:
@@ -62,6 +75,14 @@ class DevRewind(object):
     def _collect_histories(self, ctx: RuntimeContext):
         git_repo = git.Repo(self.config.repo_root)
 
-        for each_file in ctx.files:
+        for each_file, each_file_ctx in ctx.files.items():
             commits = self._collect_history(git_repo, each_file)
-            ctx.files[each_file] = commits
+            each_file_ctx.commits = commits
+
+    def _create_docs(self, ctx: RuntimeContext):
+        creator = Creator()
+        for each_file_ctx in ctx.files.values():
+            for each_commit in each_file_ctx.commits:
+                doc = creator.create_doc_from_commit(each_file_ctx.name, each_commit)
+                each_file_ctx.documents.append(doc)
+            logger.debug(f"file {each_file_ctx.name} docs: {len(each_file_ctx.documents)}")

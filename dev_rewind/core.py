@@ -27,7 +27,6 @@ class DevRewind(object):
         if exc:
             raise DevRewindException() from exc
 
-        logger.info("start rewinding ...")
         logger.debug("git metadata collecting ...")
         ctx = RuntimeContext()
         self._collect_files(ctx)
@@ -35,15 +34,11 @@ class DevRewind(object):
 
         logger.debug("building documentations ...")
         self._create_docs(ctx)
+        logger.debug("metadata ready")
         return ctx
 
     def collect_documents(self) -> typing.List[Document]:
-        docs = []
-        ctx = self.collect_metadata()
-        for each_file in ctx.files.values():
-            for each_doc in each_file.documents:
-                docs.append(each_doc)
-        return docs
+        return self.collect_metadata().documents
 
     def _check_env(self) -> typing.Optional[BaseException]:
         try:
@@ -83,6 +78,5 @@ class DevRewind(object):
         creator = Creator()
         for each_file_ctx in ctx.files.values():
             for each_commit in each_file_ctx.commits:
-                doc = creator.create_doc_from_commit(each_file_ctx.name, each_commit)
-                each_file_ctx.documents.append(doc)
-            logger.debug(f"file {each_file_ctx.name} docs: {len(each_file_ctx.documents)}")
+                doc = creator.create_doc(each_file_ctx, each_commit)
+                ctx.documents.append(doc)

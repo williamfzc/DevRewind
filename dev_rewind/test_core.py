@@ -22,7 +22,8 @@ def test_embed(doc_fixture):
     db = Chroma.from_documents(doc_fixture, embeddings)
     print("There are", db._collection.count(), "in the collection")
 
-    query = "init"
+    query = "git"
     matching_docs = db.similarity_search(query)
-    result = matching_docs[0]
-    print(result)
+
+    for each in matching_docs:
+        print(f"Matching doc: {each}")

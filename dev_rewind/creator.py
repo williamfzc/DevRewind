@@ -14,7 +14,7 @@ class Creator(object):
         metadata = {
             "sha": commit.hexsha,
             "file": file_ctx.name,
-            "author": commit.author.name,
+            "author": str(commit.author),
         }
 
         return Document(page_content=page_content, metadata=metadata)

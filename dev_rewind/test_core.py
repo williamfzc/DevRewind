@@ -1,31 +1,29 @@
-import os
-
 import pytest
-from langchain.chains import RetrievalQA
 from langchain.embeddings import SentenceTransformerEmbeddings
-from langchain.llms.openai import OpenAI
-from langchain.prompts import PromptTemplate
 from langchain.vectorstores.chroma import Chroma
 
 from dev_rewind import DevRewind, DevRewindConfig
 
 
 @pytest.fixture
-def doc_fixture():
+def meta_fixture():
     config = DevRewindConfig()
     config.repo_root = ".."
     api = DevRewind(config)
-    return api.collect_documents()
+    return api.collect_metadata()
 
 
-def test_document(doc_fixture):
-    assert doc_fixture
+def test_document(meta_fixture):
+    assert meta_fixture.file_documents
+    assert meta_fixture.commit_documents
+    assert meta_fixture.author_documents
 
 
-def test_embed(doc_fixture):
+def test_embed(meta_fixture):
     embeddings = SentenceTransformerEmbeddings(model_name="all-MiniLM-L6-v2")
-    db = Chroma.from_documents(doc_fixture, embeddings)
+    db = Chroma.from_documents(meta_fixture.commit_documents, embeddings)
     print("There are", db._collection.count(), "in the collection")
+    print(db._collection.metadata)
 
     query = "git"
     matching_docs = db.similarity_search(query)
@@ -34,49 +32,19 @@ def test_embed(doc_fixture):
         print(f"Matching doc: {each}")
 
 
-def test_with_openai(doc_fixture):
-    embeddings = SentenceTransformerEmbeddings(model_name="all-MiniLM-L6-v2")
-    os.environ["TOKENIZERS_PARALLELISM"] = "false"
-    db = Chroma.from_documents(doc_fixture, embeddings)
-
-    prompt_template = """
-Use the following pieces of commits to answer the question at the end. 
-If you don't know the answer, just say that you don't know, don't try to make up an answer.
-
-{context}
-
-Question: {question}
-"""
-    global_prompt = PromptTemplate(
-        template=prompt_template,
-        input_variables=["context", "question"],
-    )
-    doc_prompt = PromptTemplate(
-        input_variables=["page_content", "file", "author"],
-        template="commit msg: {page_content}, file: {file}, author: {author}",
-    )
-
-    chain_type_kwargs = {
-        "prompt": global_prompt,
-        "document_prompt": doc_prompt,
-    }
-
-    qa = RetrievalQA.from_chain_type(
-        llm=OpenAI(),
-        chain_type="stuff",
-        retriever=db.as_retriever(),
-        chain_type_kwargs=chain_type_kwargs,
-    )
+def test_with_openai(meta_fixture):
+    api = DevRewind()
+    retriever = api.create_retriever(ctx=meta_fixture)
+    chain = api.create_chain(retriever=retriever)
 
     # author
-    output = qa.run("""
+    output = chain.run("""
 How many commits authored by williamfzc? 
 """)
     print(f"output: {output}")
 
     # file
-    output = qa.run("""
+    output = chain.run("""
 How many files in this repo?
     """)
     print(f"output: {output}")
-

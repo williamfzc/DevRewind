@@ -1,10 +1,21 @@
+import os
+import re
 import typing
 
 import git
 from git import Commit, Repo
-from langchain.schema import Document
-from pydantic import BaseModel
+from langchain.chains import RetrievalQA
+from langchain.chains.base import Chain
+from langchain.embeddings import SentenceTransformerEmbeddings
+from langchain.llms.base import LLM
+from langchain.llms.openai import OpenAI
+from langchain.prompts import PromptTemplate
+from langchain.retrievers import EnsembleRetriever
+from langchain.schema import BaseRetriever
+from langchain.schema.embeddings import Embeddings
+from langchain.vectorstores.chroma import Chroma
 from loguru import logger
+from pydantic import BaseModel
 
 from dev_rewind.context import RuntimeContext, FileContext
 from dev_rewind.creator import Creator
@@ -14,6 +25,7 @@ from dev_rewind.exc import DevRewindException
 class DevRewindConfig(BaseModel):
     repo_root: str = "."
     max_depth_limit: int = -1
+    include_regex: str = ""
 
 
 class DevRewind(object):
@@ -37,22 +49,92 @@ class DevRewind(object):
         logger.debug("metadata ready")
         return ctx
 
-    def collect_documents(self) -> typing.List[Document]:
-        return self.collect_metadata().documents
+    def create_retriever(
+            self,
+            embeddings: Embeddings = SentenceTransformerEmbeddings(model_name="all-MiniLM-L6-v2"),
+            ctx: RuntimeContext = None,
+            retriever_kwargs: dict = None,
+    ) -> BaseRetriever:
+        if not ctx:
+            ctx = self.collect_metadata()
+
+        # supress warnings
+        os.environ["TOKENIZERS_PARALLELISM"] = "false"
+
+        file_db = Chroma.from_documents(
+            ctx.file_documents, embeddings, collection_name="file_db")
+        commit_db = Chroma.from_documents(
+            ctx.commit_documents, embeddings, collection_name="commit_db")
+        author_db = Chroma.from_documents(
+            ctx.author_documents, embeddings, collection_name="author_db")
+        return EnsembleRetriever(
+            retrievers=[
+                file_db.as_retriever(**retriever_kwargs),
+                commit_db.as_retriever(**retriever_kwargs),
+                author_db.as_retriever(**retriever_kwargs)])
+
+    def create_chain(
+            self,
+            llm: LLM = OpenAI(),
+            retriever: BaseRetriever = None,
+            **kwargs
+    ) -> Chain:
+        if not retriever:
+            retriever = self.create_retriever()
+
+        prompt_template = """
+You are a codebase analyzer.
+Use the following pieces of context to answer the question at the end. 
+If you don't know the answer, just say that you don't know, don't try to make up an answer.
+
+{context}
+
+Question: {question}
+        """
+        global_prompt = PromptTemplate(
+            template=prompt_template,
+            input_variables=["context", "question"],
+        )
+        doc_prompt = PromptTemplate(
+            input_variables=["page_content", "file", "author"],
+            template="commit msg: {page_content}, file: {file}, author: {author}",
+        )
+        chain_type_kwargs = {
+            "prompt": global_prompt,
+            "document_prompt": doc_prompt,
+            **kwargs,
+        }
+        chain = RetrievalQA.from_chain_type(
+            llm=llm,
+            chain_type="stuff",
+            retriever=retriever,
+            chain_type_kwargs=chain_type_kwargs,
+        )
+        return chain
 
     def _check_env(self) -> typing.Optional[BaseException]:
-        try:
-            _ = git.Repo(self.config.repo_root)
-        except BaseException as e:
-            return e
-        return None
+            try:
+                _ = git.Repo(self.config.repo_root)
+            except BaseException as e:
+                return e
+            return None
 
     def _collect_files(self, ctx: RuntimeContext):
         """ collect all files which tracked by git """
         git_repo = git.Repo(self.config.repo_root)
         git_track_files = set([each[1].path for each in git_repo.index.iter_blobs()])
+
+        include_regex = None
+        if self.config.include_regex:
+            include_regex = re.compile(self.config.include_regex)
+
         for each in git_track_files:
+            if include_regex:
+                if not include_regex.match(each):
+                    continue
+
             ctx.files[each] = FileContext(each)
+
         logger.debug(f"file {len(ctx.files)} collected")
 
     def _collect_history(self, repo: Repo, file_path: str) -> typing.List[Commit]:
@@ -73,10 +155,8 @@ class DevRewind(object):
         for each_file, each_file_ctx in ctx.files.items():
             commits = self._collect_history(git_repo, each_file)
             each_file_ctx.commits = commits
+            logger.debug(f"file {each_file} ready")
 
     def _create_docs(self, ctx: RuntimeContext):
         creator = Creator()
-        for each_file_ctx in ctx.files.values():
-            for each_commit in each_file_ctx.commits:
-                doc = creator.create_doc(each_file_ctx, each_commit)
-                ctx.documents.append(doc)
+        creator.create_doc(ctx)

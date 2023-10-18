@@ -6,7 +6,7 @@ authors = ["williamfzc <williamfzc@foxmail.com>"]
 license = "Apache-2.0"
 readme = "README.md"
 packages = [
-    {include = "dev_rewind"}
+    { include = "dev_rewind" }
 ]
 
 [tool.poetry.dependencies]
@@ -15,6 +15,7 @@ pydantic = "^2.4.2"
 gitpython = "^3.1.38"
 loguru = "^0.7.2"
 langchain = "^0.0.315"
+click = "^8.1.7"
 
 
 [tool.poetry.group.dev.dependencies]
@@ -23,3 +24,6 @@ pytest = "^7.4.2"
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.scripts]
+devr = 'dev_rewind.cli:interact'

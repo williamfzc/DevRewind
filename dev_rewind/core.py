@@ -57,6 +57,8 @@ class DevRewind(object):
     ) -> BaseRetriever:
         if not ctx:
             ctx = self.collect_metadata()
+        if not retriever_kwargs:
+            retriever_kwargs = dict()
 
         # supress warnings
         os.environ["TOKENIZERS_PARALLELISM"] = "false"
@@ -67,11 +69,13 @@ class DevRewind(object):
             ctx.commit_documents, embeddings, collection_name="commit_db")
         author_db = Chroma.from_documents(
             ctx.author_documents, embeddings, collection_name="author_db")
-        return EnsembleRetriever(
+        final_retriever = EnsembleRetriever(
             retrievers=[
                 file_db.as_retriever(**retriever_kwargs),
                 commit_db.as_retriever(**retriever_kwargs),
                 author_db.as_retriever(**retriever_kwargs)])
+        logger.debug("retriever created")
+        return final_retriever
 
     def create_chain(
             self,
@@ -96,8 +100,8 @@ Question: {question}
             input_variables=["context", "question"],
         )
         doc_prompt = PromptTemplate(
-            input_variables=["page_content", "file", "author"],
-            template="commit msg: {page_content}, file: {file}, author: {author}",
+            input_variables=["page_content"],
+            template="{page_content}",
         )
         chain_type_kwargs = {
             "prompt": global_prompt,
@@ -110,14 +114,17 @@ Question: {question}
             retriever=retriever,
             chain_type_kwargs=chain_type_kwargs,
         )
+        logger.debug("chain created")
         return chain
 
     def _check_env(self) -> typing.Optional[BaseException]:
-            try:
-                _ = git.Repo(self.config.repo_root)
-            except BaseException as e:
-                return e
-            return None
+        try:
+            repo = git.Repo(self.config.repo_root, search_parent_directories=True)
+            # if changed after search
+            self.config.repo_root = repo.git_dir
+        except BaseException as e:
+            return e
+        return None
 
     def _collect_files(self, ctx: RuntimeContext):
         """ collect all files which tracked by git """

@@ -1,4 +1,5 @@
 import click
+import time
 
 from dev_rewind import DevRewind
 
@@ -8,7 +9,11 @@ def interact():
     click.echo("welcome to DevRewind")
 
     dev_rewind = DevRewind()
-    qa_chain = dev_rewind.create_chain()
+    retriever = dev_rewind.create_retriever()
+    qa_chain = dev_rewind.create_chain(retriever=retriever)
+
+    # avoid the prompt coming faster than log ...
+    time.sleep(0.1)
 
     while True:
         question = click.prompt("Question")

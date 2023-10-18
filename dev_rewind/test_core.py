@@ -1,3 +1,5 @@
+import os
+
 import pytest
 from langchain.embeddings import SentenceTransformerEmbeddings
 from langchain.vectorstores.chroma import Chroma
@@ -33,6 +35,9 @@ def test_embed(meta_fixture):
 
 
 def test_with_openai(meta_fixture):
+    if "OPENAI_API_KEY" not in os.environ:
+        pytest.skip()
+
     api = DevRewind()
     retriever = api.create_retriever(ctx=meta_fixture)
     chain = api.create_chain(retriever=retriever)

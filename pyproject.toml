@@ -16,8 +16,13 @@ gitpython = "^3.1.38"
 loguru = "^0.7.2"
 langchain = "^0.0.315"
 click = "^8.1.7"
-torch = { version = "=2.1.0+cpu", source = "pytorch" }
+torch = [
+    { version = "=2.1.0", source = "pypi", platform = "darwin" },
+    { version = "=2.1.0+cpu", source = "pytorch", platform = "linux" },
+    { version = "=2.1.0+cpu", source = "pytorch", platform = "win32" },
+]
 sentence-transformers = "^2.2.2"
+chromadb = "^0.4.14"
 
 
 [tool.poetry.group.dev.dependencies]

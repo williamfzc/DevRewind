@@ -39,4 +39,4 @@ requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.poetry.scripts]
-devr = 'dev_rewind.cli:interact'
+devr = 'dev_rewind.cli.streamlit.entry:main'

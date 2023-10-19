@@ -120,6 +120,56 @@ Question: {question}
         logger.debug("chain created")
         return chain
 
+    def create_mapreduce_chain(
+            self,
+            llm: LLM = None,
+            retriever: BaseRetriever = None,
+            **kwargs
+    ) -> Chain:
+        if not llm:
+            llm = OpenAI()
+        if not retriever:
+            retriever = self.create_retriever()
+
+        # thanks: https://github.com/langchain-ai/langchain/issues/5096
+        combined_prompt_template = """
+You are a codebase analyzer.
+Use the following pieces of context to answer the question at the end. 
+If you don't know the answer, just say that you don't know, don't try to make up an answer.
+
+{summaries}
+
+Question: {question}
+                """
+        combined_prompt = PromptTemplate(
+            template=combined_prompt_template,
+            input_variables=["summaries", "question"],
+        )
+
+        map_prompt_template = """
+Make a summary for these documents. 
+Keep the summary as accurate and concise as possible.
+
+{context}
+"""
+        question_prompt = PromptTemplate(
+            template=map_prompt_template,
+            input_variables=["context"])
+
+        chain_type_kwargs = {
+            "question_prompt": question_prompt,
+            "combine_prompt": combined_prompt,
+            **kwargs
+        }
+        chain = RetrievalQA.from_chain_type(
+            llm=llm,
+            chain_type="map_reduce",
+            retriever=retriever,
+            chain_type_kwargs=chain_type_kwargs,
+        )
+        logger.debug("mapreduce chain created")
+        return chain
+
     def _check_env(self) -> typing.Optional[BaseException]:
         try:
             repo = git.Repo(self.config.repo_root, search_parent_directories=True)

@@ -10,7 +10,7 @@ def interact():
 
     dev_rewind = DevRewind()
     retriever = dev_rewind.create_retriever()
-    qa_chain = dev_rewind.create_chain(retriever=retriever)
+    qa_chain = dev_rewind.create_stuff_chain(retriever=retriever)
 
     # avoid the prompt coming faster than log ...
     time.sleep(0.1)

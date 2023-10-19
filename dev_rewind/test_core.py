@@ -40,7 +40,7 @@ def test_with_openai(meta_fixture):
 
     api = DevRewind()
     retriever = api.create_retriever(ctx=meta_fixture)
-    chain = api.create_chain(retriever=retriever)
+    chain = api.create_stuff_chain(retriever=retriever)
 
     # author
     output = chain.run("""

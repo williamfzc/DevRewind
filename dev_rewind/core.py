@@ -58,7 +58,8 @@ class DevRewind(object):
         if not ctx:
             ctx = self.collect_metadata()
         if not retriever_kwargs:
-            retriever_kwargs = dict()
+            # default kwargs
+            retriever_kwargs = {"k": 4, "include_metadata": True}
 
         # supress warnings
         os.environ["TOKENIZERS_PARALLELISM"] = "false"
@@ -77,12 +78,14 @@ class DevRewind(object):
         logger.debug("retriever created")
         return final_retriever
 
-    def create_chain(
+    def create_stuff_chain(
             self,
-            llm: LLM = OpenAI(),
+            llm: LLM = None,
             retriever: BaseRetriever = None,
             **kwargs
     ) -> Chain:
+        if not llm:
+            llm = OpenAI()
         if not retriever:
             retriever = self.create_retriever()
 

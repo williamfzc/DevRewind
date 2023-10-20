@@ -15,6 +15,7 @@ from langchain.retrievers import EnsembleRetriever
 from langchain.schema import BaseRetriever
 from langchain.schema.embeddings import Embeddings
 from langchain.vectorstores.chroma import Chroma
+from langchain.memory import ConversationBufferWindowMemory
 from loguru import logger
 from pydantic import BaseModel
 
@@ -123,6 +124,7 @@ Question: {question}
             chain_type="stuff",
             retriever=retriever,
             chain_type_kwargs=chain_type_kwargs,
+            memory=ConversationBufferWindowMemory(k=3)
         )
         logger.debug("chain created")
         return chain
@@ -154,14 +156,14 @@ Question: {question}
         )
 
         map_prompt_template = """
-Make a summary for these documents. 
+Make a summary for these documents for question: {question}
 Keep the summary as accurate and concise as possible.
 
 {context}
 """
         question_prompt = PromptTemplate(
             template=map_prompt_template,
-            input_variables=["context"])
+            input_variables=["context", "question"])
 
         chain_type_kwargs = {
             "question_prompt": question_prompt,
@@ -173,8 +175,49 @@ Keep the summary as accurate and concise as possible.
             chain_type="map_reduce",
             retriever=retriever,
             chain_type_kwargs=chain_type_kwargs,
+            memory=ConversationBufferWindowMemory(k=3)
         )
         logger.debug("mapreduce chain created")
+        return chain
+
+    def create_refine_chain(
+            self,
+            llm: LLM = None,
+            retriever: BaseRetriever = None,
+            **kwargs
+    ) -> Chain:
+        if not llm:
+            llm = OpenAI()
+        if not retriever:
+            retriever = self.create_retriever()
+
+        # thanks: https://github.com/langchain-ai/langchain/issues/5096
+        question_prompt = """
+You are a codebase analyzer.
+Use the following pieces of context to answer the question at the end. 
+If you don't know the answer, just say that you don't know, don't try to make up an answer.
+
+{context_str}
+
+Question: {question}
+                        """
+        question_prompt = PromptTemplate(
+            template=question_prompt,
+            input_variables=["context_str", "question"],
+        )
+
+        chain_type_kwargs = {
+            "question_prompt": question_prompt,
+            **kwargs
+        }
+        chain = RetrievalQA.from_chain_type(
+            llm=llm,
+            chain_type="refine",
+            retriever=retriever,
+            chain_type_kwargs=chain_type_kwargs,
+            memory=ConversationBufferWindowMemory(k=3)
+        )
+        logger.debug("refine chain created")
         return chain
 
     def _check_env(self) -> typing.Optional[BaseException]:

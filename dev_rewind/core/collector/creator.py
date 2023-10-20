@@ -4,7 +4,7 @@ from git import Commit
 from langchain.schema import Document
 from pydantic import BaseModel
 
-from dev_rewind.context import RuntimeContext
+from dev_rewind.core.context import RuntimeContext
 
 
 class _Author(BaseModel):
@@ -32,8 +32,9 @@ class Creator(object):
             file_dict[each_file.name] = _File(name=each_file.name)
             for each_commit in each_file.commits:
                 commit_dict[each_commit.hexsha] = each_commit
-                author_dict[each_commit.author.email] = _Author(name=each_commit.author.name,
-                                                                email=each_commit.author.email)
+                author_dict[each_commit.author.email] = _Author(
+                    name=each_commit.author.name, email=each_commit.author.email
+                )
                 file_dict[each_file.name].blames.append(each_commit.hexsha)
 
         # author doc
@@ -43,10 +44,10 @@ class Creator(object):
 author: {each_author.name}
 email: {each_author.email}
 """
-            metadata = {
-                "source": each_author.email
-            }
-            ctx.author_documents.append(Document(page_content=page_content, metadata=metadata))
+            metadata = {"source": each_author.email}
+            ctx.author_documents.append(
+                Document(page_content=page_content, metadata=metadata)
+            )
 
         # commit doc
         for each_commit in commit_dict.values():
@@ -64,7 +65,9 @@ time: {each_commit.authored_datetime}
                 "source": each_commit.hexsha,
             }
 
-            ctx.commit_documents.append(Document(page_content=page_content, metadata=metadata))
+            ctx.commit_documents.append(
+                Document(page_content=page_content, metadata=metadata)
+            )
 
         # file doc
         for each_file in file_dict.values():
@@ -73,8 +76,8 @@ time: {each_commit.authored_datetime}
 path: {each_file.name}
 related commits: {", ".join(each_file.blames)}
 """
-            metadata = {
-                "source": each_file.name
-            }
+            metadata = {"source": each_file.name}
 
-            ctx.file_documents.append(Document(page_content=page_content, metadata=metadata))
+            ctx.file_documents.append(
+                Document(page_content=page_content, metadata=metadata)
+            )

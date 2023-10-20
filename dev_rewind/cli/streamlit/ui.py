@@ -1,19 +1,15 @@
 import streamlit as st
 
 from dev_rewind import DevRewind
-from llpp import CustomLLM
 
-st.set_page_config(
-    page_title="DevRewind Bot",
-    page_icon=":robot:"
-)
+st.set_page_config(page_title="DevRewind Bot", page_icon=":robot:")
 
 
 @st.cache_resource
 def get_model():
     dev_rewind = DevRewind()
     retriever = dev_rewind.create_ensemble_retriever()
-    qa_chain = dev_rewind.create_mapreduce_chain(llm=CustomLLM(n=10), retriever=retriever)
+    qa_chain = dev_rewind.create_mapreduce_chain(retriever=retriever, verbose=True)
     return qa_chain
 
 

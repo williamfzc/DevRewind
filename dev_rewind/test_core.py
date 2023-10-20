@@ -43,13 +43,17 @@ def test_with_openai(meta_fixture):
     chain = api.create_stuff_chain(retriever=retriever)
 
     # author
-    output = chain.run("""
+    output = chain.run(
+        """
 How many commits authored by williamfzc? 
-""")
+"""
+    )
     print(f"output: {output}")
 
     # file
-    output = chain.run("""
+    output = chain.run(
+        """
 How many files in this repo?
-    """)
+    """
+    )
     print(f"output: {output}")

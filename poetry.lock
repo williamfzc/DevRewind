@@ -1645,8 +1645,8 @@ files = [
 [package.dependencies]
 numpy = [
     {version = ">=1.20.3", markers = "python_version < \"3.10\""},
-    {version = ">=1.21.0", markers = "python_version >= \"3.10\" and python_version < \"3.11\""},
     {version = ">=1.23.2", markers = "python_version >= \"3.11\""},
+    {version = ">=1.21.0", markers = "python_version >= \"3.10\" and python_version < \"3.11\""},
 ]
 python-dateutil = ">=2.8.2"
 pytz = ">=2020.1"
@@ -3205,14 +3205,6 @@ name = "torch"
 version = "2.1.0+cpu"
 description = "Tensors and Dynamic neural networks in Python with strong GPU acceleration"
 optional = false
-python-versions = "*"
-files = []
-
-[[package]]
-name = "torch"
-version = "2.1.0+cpu"
-description = "Tensors and Dynamic neural networks in Python with strong GPU acceleration"
-optional = false
 python-versions = ">=3.8.0"
 files = [
     {file = "torch-2.1.0+cpu-cp310-cp310-linux_x86_64.whl", hash = "sha256:5077921fc2b54e69a534f3a9c0b98493c79a5547c49d46f5e77e42da3610e011"},
@@ -3903,4 +3895,4 @@ testing = ["big-O", "jaraco.functools", "jaraco.itertools", "more-itertools", "p
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.8.1,!=3.9.7"
-content-hash = "b50998b34938632292436c555d2b73238f624c42c0b814a10cbcc163b6aee818"
+content-hash = "96666d60cfde5986f88f5a098baccde58906067f33e6ff7affbb895153de1aca"

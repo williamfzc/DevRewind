@@ -1,7 +1,6 @@
 import os
 import re
 import typing
-from enum import Enum
 
 import git
 from git import Commit, Repo
@@ -17,23 +16,13 @@ from langchain.schema.embeddings import Embeddings
 from langchain.vectorstores.chroma import Chroma
 from langchain.memory import ConversationBufferWindowMemory
 from loguru import logger
-from pydantic import BaseModel
+
+from dev_rewind import DevRewindConfig
+from dev_rewind.config import FileLevelEnum
 
 from dev_rewind.context import RuntimeContext, FileContext
 from dev_rewind.creator import Creator
 from dev_rewind.exc import DevRewindException
-
-
-class FileLevelEnum(str, Enum):
-    FILE: str = "FILE"
-    DIR: str = "DIR"
-
-
-class DevRewindConfig(BaseModel):
-    repo_root: str = "."
-    max_depth_limit: int = -1
-    include_regex: str = ""
-    file_level: FileLevelEnum = FileLevelEnum.FILE
 
 
 class DevRewind(object):
@@ -57,7 +46,7 @@ class DevRewind(object):
         logger.debug("metadata ready")
         return ctx
 
-    def create_retriever(
+    def create_ensemble_retriever(
             self,
             embeddings: Embeddings = SentenceTransformerEmbeddings(model_name="all-MiniLM-L6-v2"),
             ctx: RuntimeContext = None,
@@ -72,19 +61,42 @@ class DevRewind(object):
         # supress warnings
         os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
-        file_db = Chroma.from_documents(
-            ctx.file_documents, embeddings, collection_name="file_db")
-        commit_db = Chroma.from_documents(
-            ctx.commit_documents, embeddings, collection_name="commit_db")
-        author_db = Chroma.from_documents(
-            ctx.author_documents, embeddings, collection_name="author_db")
+        file_retriever = self.create_single_retriever("file", embeddings, ctx, retriever_kwargs)
+        commit_retriever = self.create_single_retriever("commit", embeddings, ctx, retriever_kwargs)
+        author_retriever = self.create_single_retriever("author", embeddings, ctx, retriever_kwargs)
+
         final_retriever = EnsembleRetriever(
-            retrievers=[
-                file_db.as_retriever(**retriever_kwargs),
-                commit_db.as_retriever(**retriever_kwargs),
-                author_db.as_retriever(**retriever_kwargs)])
+            retrievers=[file_retriever, commit_retriever, author_retriever])
         logger.debug("retriever created")
         return final_retriever
+
+    def create_single_retriever(
+            self,
+            retriever_type: str,
+            embeddings: Embeddings = SentenceTransformerEmbeddings(model_name="all-MiniLM-L6-v2"),
+            ctx: RuntimeContext = None,
+            retriever_kwargs: dict = None,
+    ) -> BaseRetriever:
+        if not ctx:
+            ctx = self.collect_metadata()
+        if not retriever_kwargs:
+            # default kwargs
+            retriever_kwargs = {"k": 4, "include_metadata": True}
+
+        # supress warnings
+        os.environ["TOKENIZERS_PARALLELISM"] = "false"
+
+        if retriever_type == "file":
+            db = Chroma.from_documents(ctx.file_documents, embeddings, collection_name="file_db")
+        elif retriever_type == "commit":
+            db = Chroma.from_documents(ctx.commit_documents, embeddings, collection_name="commit_db")
+        elif retriever_type == "author":
+            db = Chroma.from_documents(ctx.author_documents, embeddings, collection_name="author_db")
+        else:
+            # should not happen
+            raise DevRewindException(f"invalid retriever type: {retriever_type}")
+
+        return db.as_retriever(**retriever_kwargs)
 
     def create_stuff_chain(
             self,
@@ -95,7 +107,7 @@ class DevRewind(object):
         if not llm:
             llm = OpenAI()
         if not retriever:
-            retriever = self.create_retriever()
+            retriever = self.create_ensemble_retriever()
 
         prompt_template = """
 You are a codebase analyzer.
@@ -138,7 +150,7 @@ Question: {question}
         if not llm:
             llm = OpenAI()
         if not retriever:
-            retriever = self.create_retriever()
+            retriever = self.create_ensemble_retriever()
 
         # thanks: https://github.com/langchain-ai/langchain/issues/5096
         combined_prompt_template = """
@@ -189,7 +201,7 @@ Keep the summary as accurate and concise as possible.
         if not llm:
             llm = OpenAI()
         if not retriever:
-            retriever = self.create_retriever()
+            retriever = self.create_ensemble_retriever()
 
         # thanks: https://github.com/langchain-ai/langchain/issues/5096
         question_prompt = """

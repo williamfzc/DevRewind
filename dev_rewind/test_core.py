@@ -39,7 +39,7 @@ def test_with_openai(meta_fixture):
         pytest.skip("no openapi key for test")
 
     api = DevRewind()
-    retriever = api.create_retriever(ctx=meta_fixture)
+    retriever = api.create_ensemble_retriever(ctx=meta_fixture)
     chain = api.create_stuff_chain(retriever=retriever)
 
     # author

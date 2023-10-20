@@ -12,7 +12,7 @@ st.set_page_config(
 @st.cache_resource
 def get_model():
     dev_rewind = DevRewind()
-    retriever = dev_rewind.create_retriever()
+    retriever = dev_rewind.create_ensemble_retriever()
     qa_chain = dev_rewind.create_mapreduce_chain(llm=CustomLLM(n=10), retriever=retriever)
     return qa_chain
 

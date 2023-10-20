@@ -1,6 +1,7 @@
 import os
 import re
 import typing
+from enum import Enum
 
 import git
 from git import Commit, Repo
@@ -22,10 +23,16 @@ from dev_rewind.creator import Creator
 from dev_rewind.exc import DevRewindException
 
 
+class FileLevelEnum(str, Enum):
+    FILE: str = "FILE"
+    DIR: str = "DIR"
+
+
 class DevRewindConfig(BaseModel):
     repo_root: str = "."
     max_depth_limit: int = -1
     include_regex: str = ""
+    file_level: FileLevelEnum = FileLevelEnum.FILE
 
 
 class DevRewind(object):
@@ -193,7 +200,13 @@ Keep the summary as accurate and concise as possible.
                 if not include_regex.match(each):
                     continue
 
-            ctx.files[each] = FileContext(each)
+            if self.config.file_level == FileLevelEnum.FILE:
+                ctx.files[each] = FileContext(each)
+            elif self.config.file_level == FileLevelEnum.DIR:
+                each_dir = os.path.dirname(each)
+                ctx.files[each_dir] = FileContext(each_dir)
+            else:
+                raise DevRewindException(f"invalid file level: {self.config.file_level}")
 
         logger.debug(f"file {len(ctx.files)} collected")
 

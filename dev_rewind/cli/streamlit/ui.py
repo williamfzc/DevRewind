@@ -1,26 +1,38 @@
 import streamlit as st
 
-st.title("Echo Bot")
+from dev_rewind import DevRewind
+from llpp import CustomLLM
 
-# Initialize chat history
+st.set_page_config(
+    page_title="DevRewind Bot",
+    page_icon=":robot:"
+)
+
+
+@st.cache_resource
+def get_model():
+    dev_rewind = DevRewind()
+    retriever = dev_rewind.create_retriever()
+    qa_chain = dev_rewind.create_mapreduce_chain(llm=CustomLLM(n=10), retriever=retriever)
+    return qa_chain
+
+
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-# Display chat messages from history on app rerun
-for message in st.session_state.messages:
-    with st.chat_message(message["role"]):
-        st.markdown(message["content"])
-
-# React to user input
-if prompt := st.chat_input("What is up?"):
-    # Display user message in chat message container
-    st.chat_message("user").markdown(prompt)
-    # Add user message to chat history
-    st.session_state.messages.append({"role": "user", "content": prompt})
-
-    response = f"Echo: {prompt}"
-    # Display assistant response in chat message container
+for i, (prompt, response) in enumerate(st.session_state.messages):
+    with st.chat_message("user"):
+        st.markdown(prompt)
     with st.chat_message("assistant"):
         st.markdown(response)
-    # Add assistant response to chat history
-    st.session_state.messages.append({"role": "assistant", "content": response})
+
+if prompt := st.chat_input("Start your conversation"):
+    model = get_model()
+    with st.chat_message("user"):
+        st.markdown(prompt)
+
+    with st.chat_message("assistant"):
+        message_placeholder = st.empty()
+        full_response = model.run(prompt)
+        message_placeholder.markdown(full_response)
+    st.session_state.messages.append((prompt, full_response))

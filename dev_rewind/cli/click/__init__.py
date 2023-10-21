@@ -9,8 +9,7 @@ def cli_click():
     click.echo("welcome to DevRewind")
 
     dev_rewind = DevRewind()
-    retriever = dev_rewind.create_ensemble_retriever()
-    qa_chain = dev_rewind.create_stuff_chain(retriever=retriever)
+    qa_chain = dev_rewind.create_router_chain()
 
     # avoid the prompt coming faster than log ...
     time.sleep(0.1)

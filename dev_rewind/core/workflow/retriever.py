@@ -1,4 +1,5 @@
 import os
+from enum import Enum
 
 from langchain.embeddings import SentenceTransformerEmbeddings
 from langchain.retrievers import EnsembleRetriever
@@ -12,14 +13,20 @@ from dev_rewind.core.context import RuntimeContext
 from dev_rewind.exc import DevRewindException
 
 
+class RetrieverType(str, Enum):
+    FILE = "FILE"
+    AUTHOR = "AUTHOR"
+    COMMIT = "COMMIT"
+
+
 class RetrieverLayer(CollectorLayer):
     def create_ensemble_retriever(
-            self,
-            embeddings: Embeddings = SentenceTransformerEmbeddings(
-                model_name="all-MiniLM-L6-v2"
-            ),
-            ctx: RuntimeContext = None,
-            retriever_kwargs: dict = None,
+        self,
+        embeddings: Embeddings = SentenceTransformerEmbeddings(
+            model_name="all-MiniLM-L6-v2"
+        ),
+        ctx: RuntimeContext = None,
+        retriever_kwargs: dict = None,
     ) -> BaseRetriever:
         if not ctx:
             ctx = self.collect_metadata()
@@ -31,13 +38,13 @@ class RetrieverLayer(CollectorLayer):
         os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
         file_retriever = self.create_single_retriever(
-            "file", embeddings, ctx, retriever_kwargs
+            RetrieverType.FILE, embeddings, ctx, retriever_kwargs
         )
         commit_retriever = self.create_single_retriever(
-            "commit", embeddings, ctx, retriever_kwargs
+            RetrieverType.COMMIT, embeddings, ctx, retriever_kwargs
         )
         author_retriever = self.create_single_retriever(
-            "author", embeddings, ctx, retriever_kwargs
+            RetrieverType.AUTHOR, embeddings, ctx, retriever_kwargs
         )
 
         final_retriever = EnsembleRetriever(
@@ -47,13 +54,13 @@ class RetrieverLayer(CollectorLayer):
         return final_retriever
 
     def create_single_retriever(
-            self,
-            retriever_type: str,
-            embeddings: Embeddings = SentenceTransformerEmbeddings(
-                model_name="all-MiniLM-L6-v2"
-            ),
-            ctx: RuntimeContext = None,
-            retriever_kwargs: dict = None,
+        self,
+        retriever_type: str,
+        embeddings: Embeddings = SentenceTransformerEmbeddings(
+            model_name="all-MiniLM-L6-v2"
+        ),
+        ctx: RuntimeContext = None,
+        retriever_kwargs: dict = None,
     ) -> BaseRetriever:
         if not ctx:
             ctx = self.collect_metadata()
@@ -64,15 +71,15 @@ class RetrieverLayer(CollectorLayer):
         # supress warnings
         os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
-        if retriever_type == "file":
+        if retriever_type == RetrieverType.FILE:
             db = Chroma.from_documents(
                 ctx.file_documents, embeddings, collection_name="file_db"
             )
-        elif retriever_type == "commit":
+        elif retriever_type == RetrieverType.COMMIT:
             db = Chroma.from_documents(
                 ctx.commit_documents, embeddings, collection_name="commit_db"
             )
-        elif retriever_type == "author":
+        elif retriever_type == RetrieverType.AUTHOR:
             db = Chroma.from_documents(
                 ctx.author_documents, embeddings, collection_name="author_db"
             )

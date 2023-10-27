@@ -53,10 +53,7 @@ email: {each_author.email}
         for each_commit in commit_dict.values():
             # which should be searched by vectorstore
             page_content = f"""
-[Commit Info]
-msg: {each_commit.message.strip()}
-author: {each_commit.author.name} <{each_commit.author.email}>
-time: {each_commit.authored_datetime}
+commit msg: {each_commit.message.strip()}
 """
             # which only should be used in LLM part
             metadata = {

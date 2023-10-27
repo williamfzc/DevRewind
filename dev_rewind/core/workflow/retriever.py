@@ -14,9 +14,12 @@ from dev_rewind.exc import DevRewindException
 
 
 class RetrieverType(str, Enum):
-    FILE = "FILE"
-    AUTHOR = "AUTHOR"
-    COMMIT = "COMMIT"
+    FILE: str = "FILE"
+    AUTHOR: str = "AUTHOR"
+    COMMIT: str = "COMMIT"
+
+    def __str__(self) -> str:
+        return self.value
 
 
 class RetrieverLayer(CollectorLayer):

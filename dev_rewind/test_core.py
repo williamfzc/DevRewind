@@ -5,6 +5,7 @@ from langchain.embeddings import SentenceTransformerEmbeddings
 from langchain.vectorstores.chroma import Chroma
 
 from dev_rewind import DevRewind, DevRewindConfig
+from dev_rewind.core.workflow.agent import create_agent
 
 
 @pytest.fixture
@@ -32,6 +33,24 @@ def test_embed(meta_fixture):
 
     for each in matching_docs:
         print(f"Matching doc: {each}")
+
+
+def test_agent():
+    if "OPENAI_API_KEY" not in os.environ:
+        pytest.skip("no openapi key for test")
+
+    agent = create_agent()
+    # hacky way from https://github.com/langchain-ai/langchain/issues/1358#issuecomment-1486132587
+    try:
+        response = agent.run(input="chain.py 的功能是什么？")
+    except ValueError as e:
+        response = str(e)
+        if not response.startswith("Could not parse LLM output:"):
+            raise e
+        response = response.removeprefix("Could not parse LLM output:").removesuffix(
+            "`"
+        )
+    print(response)
 
 
 def test_with_openai(meta_fixture):

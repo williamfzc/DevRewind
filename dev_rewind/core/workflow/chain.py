@@ -1,4 +1,6 @@
-from langchain.chains import RetrievalQA, LLMChain, ConversationChain, MultiPromptChain
+import typing
+
+from langchain.chains import RetrievalQA, ConversationChain, MultiPromptChain, SequentialChain, TransformChain
 from langchain.chains.base import Chain
 from langchain.chains.router.llm_router import RouterOutputParser, LLMRouterChain
 from langchain.chains.router.multi_prompt_prompt import MULTI_PROMPT_ROUTER_TEMPLATE
@@ -28,38 +30,22 @@ class ChainLayer(RetrieverLayer):
     others: search all
     """
 
-    commit_prompt_template = """
-You are a codebase analyzer.
-Use the following pieces of context to answer the question at the end. 
-If you don't know the answer, just say that you don't know, don't try to make up an answer.
-
-{context}
-
-Question: {question}
-"""
-    author_prompt_template = commit_prompt_template
-    file_prompt_template = commit_prompt_template
-    other_prompt_template = commit_prompt_template
     prompt_infos = [
         {
             "name": RetrieverType.COMMIT,
             "description": "Good for answering questions about commit",
-            "prompt_template": commit_prompt_template,
         },
         {
             "name": RetrieverType.AUTHOR,
             "description": "Good for answering questions about author",
-            "prompt_template": author_prompt_template,
         },
         {
             "name": RetrieverType.FILE,
             "description": "Good for answering questions about file/dir",
-            "prompt_template": file_prompt_template,
         },
         {
             "name": "others",
             "description": "Good for answering pointless questions",
-            "prompt_template": other_prompt_template,
         },
     ]
 
@@ -76,9 +62,7 @@ Question: {question}
             # prompt = PromptTemplate(template=prompt_template, input_variables=["input"])
 
             if name == RetrieverType.FILE:
-                chain = self.create_stuff_chain(
-                    llm, self.create_single_retriever(RetrieverType.FILE, ctx=ctx)
-                )
+                chain = self.create_file_first_search_chain(llm, ctx=ctx)
             elif name == RetrieverType.AUTHOR:
                 chain = self.create_stuff_chain(
                     llm, self.create_single_retriever(RetrieverType.AUTHOR, ctx=ctx)
@@ -115,13 +99,51 @@ Question: {question}
         router_chain = LLMRouterChain.from_llm(llm, router_prompt)
         return router_chain
 
+    def create_conclusion_chain(self) -> Chain:
+        def transform_func(inputs: dict) -> dict:
+            return {"result": str(inputs)}
+
+        return TransformChain(
+            input_variables=["file_context", "commit_context"],
+            output_variables=["result"],
+            transform=transform_func,
+        )
+
+    def create_file_first_search_chain(
+            self, llm: LLM = None, ctx: RuntimeContext = None
+    ) -> Chain:
+        overall_chain = SequentialChain(
+            chains=[
+                self.create_stuff_chain(
+                    llm,
+                    self.create_single_retriever(RetrieverType.FILE, ctx=ctx),
+                    output_key="file_context",
+                    verbose=True,
+                ),
+                self.create_stuff_chain(
+                    llm,
+                    self.create_single_retriever(RetrieverType.COMMIT, ctx=ctx),
+                    output_key="commit_context",
+                    # TODO: bug here, can not handle any keys
+                    additional_input_keys=[],
+                    verbose=True,
+                ),
+                self.create_conclusion_chain(),
+            ],
+            input_variables=["input"],
+            verbose=True,
+        )
+        return overall_chain
+
+
     def create_stuff_chain(
-        self, llm: LLM = None, retriever: BaseRetriever = None, **kwargs
+        self, llm: LLM = None, retriever: BaseRetriever = None, output_key: str = None, additional_input_keys: typing.List[str] = None, **kwargs
     ) -> Chain:
         if not llm:
             llm = OpenAI()
         if not retriever:
             retriever = self.create_ensemble_retriever()
+        user_output_key = output_key
 
         prompt_template = """
 You are a codebase analyzer.
@@ -131,108 +153,45 @@ If you don't know the answer, just say that you don't know, don't try to make up
 {context}
 
 Question: {question}
-        """
+"""
+        if additional_input_keys:
+            additional_str = "\n".join((f"{{{each}}}" for each in additional_input_keys))
+            prompt_template = prompt_template.replace("{context}", f"{{context}}\n\n{additional_str}")
+        logger.debug(f"prompt template: {prompt_template}")
+
         global_prompt = PromptTemplate(
             template=prompt_template,
-            input_variables=["context", "question"],
+            input_variables=["context", "question"] + (additional_input_keys or []),
         )
         doc_prompt = PromptTemplate(
-            input_variables=["page_content"],
             template="{page_content}",
+            input_variables=["page_content"],
         )
         chain_type_kwargs = {
             "prompt": global_prompt,
             "document_prompt": doc_prompt,
             **kwargs,
         }
-        chain = RetrievalQA.from_chain_type(
+
+        # https://github.com/langchain-ai/langchain/discussions/8668
+        class CustomRetrievalQA(RetrievalQA):
+            input_key: str = "input"
+            output_key: str = user_output_key  #: :meta private:
+
+            @property
+            def output_keys(self) -> typing.List[str]:
+                _output_keys = [self.output_key]
+                return _output_keys
+
+            @property
+            def input_keys(self) -> typing.List[str]:
+                return [self.input_key, *(additional_input_keys or [])]
+
+        chain = CustomRetrievalQA.from_chain_type(
             llm=llm,
             chain_type="stuff",
             retriever=retriever,
             chain_type_kwargs=chain_type_kwargs,
-            memory=ConversationBufferWindowMemory(k=3),
         )
-        logger.debug("chain created")
-        return chain
-
-    def create_mapreduce_chain(
-        self, llm: LLM = None, retriever: BaseRetriever = None, **kwargs
-    ) -> Chain:
-        if not llm:
-            llm = OpenAI()
-        if not retriever:
-            retriever = self.create_ensemble_retriever()
-
-        # thanks: https://github.com/langchain-ai/langchain/issues/5096
-        combined_prompt_template = """
-You are a codebase analyzer.
-Use the following pieces of context to answer the question at the end. 
-If you don't know the answer, just say that you don't know, don't try to make up an answer.
-
-{summaries}
-
-Question: {question}
-                """
-        combined_prompt = PromptTemplate(
-            template=combined_prompt_template,
-            input_variables=["summaries", "question"],
-        )
-
-        map_prompt_template = """
-Make a summary for these documents for question: {question}
-Keep the summary as accurate and concise as possible.
-
-{context}
-"""
-        question_prompt = PromptTemplate(
-            template=map_prompt_template, input_variables=["context", "question"]
-        )
-
-        chain_type_kwargs = {
-            "question_prompt": question_prompt,
-            "combine_prompt": combined_prompt,
-            **kwargs,
-        }
-        chain = RetrievalQA.from_chain_type(
-            llm=llm,
-            chain_type="map_reduce",
-            retriever=retriever,
-            chain_type_kwargs=chain_type_kwargs,
-            memory=ConversationBufferWindowMemory(k=3),
-        )
-        logger.debug("mapreduce chain created")
-        return chain
-
-    def create_refine_chain(
-        self, llm: LLM = None, retriever: BaseRetriever = None, **kwargs
-    ) -> Chain:
-        if not llm:
-            llm = OpenAI()
-        if not retriever:
-            retriever = self.create_ensemble_retriever()
-
-        # thanks: https://github.com/langchain-ai/langchain/issues/5096
-        question_prompt = """
-You are a codebase analyzer.
-Use the following pieces of context to answer the question at the end. 
-If you don't know the answer, just say that you don't know, don't try to make up an answer.
-
-{context_str}
-
-Question: {question}
-                        """
-        question_prompt = PromptTemplate(
-            template=question_prompt,
-            input_variables=["context_str", "question"],
-        )
-
-        chain_type_kwargs = {"question_prompt": question_prompt, **kwargs}
-        chain = RetrievalQA.from_chain_type(
-            llm=llm,
-            chain_type="refine",
-            retriever=retriever,
-            chain_type_kwargs=chain_type_kwargs,
-            memory=ConversationBufferWindowMemory(k=3),
-        )
-        logger.debug("refine chain created")
+        logger.debug(f"chain created, io: {chain.input_keys} / {chain.output_keys}")
         return chain

@@ -31,5 +31,9 @@ jobs:
           curl -sSL https://install.python-poetry.org | python - -y
       - name: pytest
         run: |
+          poetry add sentence_transformers
+          poetry source add -p explicit pytorch https://download.pytorch.org/whl/cpu
+          poetry add --source pytorch torch torchvision
           poetry install
+
           poetry run pytest

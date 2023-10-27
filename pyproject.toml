@@ -16,25 +16,14 @@ gitpython = "^3.1.38"
 loguru = "^0.7.2"
 langchain = "^0.0.315"
 click = "^8.1.7"
-torch = [
-    { version = "=2.1.0", source = "pypi", platform = "darwin" },
-    { version = "=2.1.0", source = "pytorch", platform = "linux" },
-    { version = "=2.1.0", source = "pytorch", platform = "win32" },
-]
-sentence-transformers = "^2.2.2"
 chromadb = "^0.4.14"
 tiktoken = "^0.5.1"
 streamlit = "^1.27.2"
+rapidfuzz = "^3.4.0"
 
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^7.4.2"
-
-
-[[tool.poetry.source]]
-name = "pytorch"
-url = "https://download.pytorch.org/whl/cpu"
-priority = "explicit"
 
 [build-system]
 requires = ["poetry-core"]

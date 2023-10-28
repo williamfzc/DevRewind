@@ -1,4 +1,5 @@
 import typing
+from json import JSONDecodeError
 
 from langchain.agents import AgentExecutor, ConversationalChatAgent, AgentOutputParser
 from langchain.agents.conversational_chat.prompt import FORMAT_INSTRUCTIONS
@@ -39,9 +40,11 @@ class CustomOutputParser(AgentOutputParser):
             return self._process_dict(response, text)
 
         # try markdown json
-        response = parse_json_markdown(text)
-        if response:
+        try:
+            response = parse_json_markdown(text)
             return self._process_dict(response, text)
+        except JSONDecodeError:
+            pass
 
         # still failed, do some hack ...
         if "```" not in text:
@@ -54,6 +57,9 @@ class CustomOutputParser(AgentOutputParser):
         response = parse_json_markdown(text)
         if response:
             return self._process_dict(response, text)
+
+        # treat it as a raw string
+        return AgentFinish({"output": text}, text)
 
 
 class CustomAgentExecutor(AgentExecutor):

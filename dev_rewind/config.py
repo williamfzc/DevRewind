@@ -10,7 +10,10 @@ class FileLevelEnum(str, Enum):
 
 class DevRewindConfig(BaseModel):
     repo_root: str = "."
-    max_depth_limit: int = -1
+
+    # set it to -1 will query all the commits
+    max_depth_limit: int = 32
+
     include_regex: str = ""
     keyword_limit: int = 10
     file_level: FileLevelEnum = FileLevelEnum.FILE

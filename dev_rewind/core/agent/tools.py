@@ -3,6 +3,7 @@ import typing
 from git import Commit
 from langchain.chains import LLMChain, StuffDocumentsChain
 from langchain.llms import BaseLLM
+from langchain.output_parsers.json import parse_partial_json
 from langchain.prompts import PromptTemplate
 from langchain.schema import Document
 from langchain.tools import BaseTool
@@ -97,14 +98,13 @@ It will return:
                 file_name = possible_file_name
 
             # check the cache
-            file_query = Query()
-            cache_resp = runtime_context.cache.search(file_query.file_name == file_name)
-            if cache_resp:
+            cached_keywords = runtime_context.cache.read(file_name)
+            if cached_keywords:
                 logger.debug(f"found {file_name} 's cache")
                 return KeywordResponse(
                     ok=True,
                     msg=f"the real file name should be: {file_name}",
-                    data=cache_resp[0]["resp"],
+                    data=cached_keywords,
                 )
 
             # start a chain for summarizing
@@ -113,12 +113,8 @@ It will return:
                 config.keyword_limit,
                 custom_llm,
             )
-            runtime_context.cache.insert(
-                {
-                    "file_name": file_name,
-                    "resp": llm_resp,
-                }
-            )
+            keywords = parse_partial_json(llm_resp)
+            runtime_context.cache.create(file_name, keywords)
 
             return KeywordResponse(
                 ok=True,

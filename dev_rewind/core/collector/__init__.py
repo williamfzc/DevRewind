@@ -23,7 +23,7 @@ class CollectorLayer(object):
             raise DevRewindException() from exc
 
         logger.debug("git metadata collecting ...")
-        ctx = RuntimeContext(self.config.cache)
+        ctx = RuntimeContext(self.config.cache_dir)
         self._collect_files(ctx)
         self._collect_histories(ctx)
 

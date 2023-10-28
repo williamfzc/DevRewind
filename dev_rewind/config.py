@@ -19,4 +19,4 @@ class DevRewindConfig(BaseModel):
 
     include_regex: str = ""
     file_level: FileLevelEnum = FileLevelEnum.FILE
-    cache: str = ".devrewind_cache.json"
+    cache_dir: str = ".devrewind_cache"

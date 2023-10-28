@@ -14,6 +14,9 @@ class DevRewindConfig(BaseModel):
     # set it to -1 will query all the commits
     max_depth_limit: int = 32
 
-    include_regex: str = ""
+    # keyword limit for each file
     keyword_limit: int = 10
+
+    include_regex: str = ""
     file_level: FileLevelEnum = FileLevelEnum.FILE
+    cache: str = ".devrewind_cache.json"

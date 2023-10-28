@@ -9,6 +9,7 @@ from langchain.tools import BaseTool
 from loguru import logger
 from pydantic import BaseModel
 from rapidfuzz import fuzz
+from tinydb import Query
 
 from dev_rewind.config import DevRewindConfig
 from dev_rewind.core.context import RuntimeContext
@@ -95,12 +96,30 @@ It will return:
                 )
                 file_name = possible_file_name
 
+            # check the cache
+            file_query = Query()
+            cache_resp = runtime_context.cache.search(file_query.file_name == file_name)
+            if cache_resp:
+                logger.debug(f"found {file_name} 's cache")
+                return KeywordResponse(
+                    ok=True,
+                    msg=f"the real file name should be: {file_name}",
+                    data=cache_resp[0]["resp"],
+                )
+
             # start a chain for summarizing
             llm_resp = summarize_commits_with_llm(
                 runtime_context.files[file_name].commits,
                 config.keyword_limit,
                 custom_llm,
             )
+            runtime_context.cache.insert(
+                {
+                    "file_name": file_name,
+                    "resp": llm_resp,
+                }
+            )
+
             return KeywordResponse(
                 ok=True,
                 msg=f"the real file name should be: {file_name}",

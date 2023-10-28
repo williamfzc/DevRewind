@@ -5,7 +5,7 @@ from langchain.agents.conversational_chat.prompt import FORMAT_INSTRUCTIONS
 from langchain.llms import BaseLLM
 from langchain.llms.openai import OpenAI
 from langchain.memory import ConversationBufferMemory
-from langchain.output_parsers.json import parse_json_markdown
+from langchain.output_parsers.json import parse_json_markdown, parse_partial_json
 from langchain.schema import AgentAction, AgentFinish
 from langchain.tools import BaseTool
 
@@ -18,9 +18,32 @@ class CustomOutputParser(AgentOutputParser):
     def get_format_instructions(self) -> str:
         return FORMAT_INSTRUCTIONS
 
+    def _process_dict(
+        self, response: dict, text: str
+    ) -> typing.Union[AgentAction, AgentFinish]:
+        # resp to action
+        action_value = response["action"]
+        action_input_value = response["action_input"]
+        if action_value == "Final Answer":
+            return AgentFinish({"output": action_input_value}, text)
+        else:
+            return AgentAction(action_value, action_input_value, text)
+
     def parse(self, text: str) -> typing.Union[AgentAction, AgentFinish]:
         # contains some prefix ...
         # really weird.
+
+        # try raw json first
+        response = parse_partial_json(text)
+        if response:
+            return self._process_dict(response, text)
+
+        # try markdown json
+        response = parse_json_markdown(text)
+        if response:
+            return self._process_dict(response, text)
+
+        # still failed, do some hack ...
         if "```" not in text:
             return AgentFinish({"output": text}, "")
         ptr = text.index("```")
@@ -29,13 +52,8 @@ class CustomOutputParser(AgentOutputParser):
             text += "`"
 
         response = parse_json_markdown(text)
-
-        action_value = response["action"]
-        action_input_value = response["action_input"]
-        if action_value == "Final Answer":
-            return AgentFinish({"output": action_input_value}, text)
-        else:
-            return AgentAction(action_value, action_input_value, text)
+        if response:
+            return self._process_dict(response, text)
 
 
 class CustomAgentExecutor(AgentExecutor):
@@ -60,6 +78,7 @@ class AgentLayer(CollectorLayer):
         if not runtime_context:
             runtime_context = self.collect_metadata()
         if not custom_llm:
+            # maybe should be a chat model
             custom_llm = OpenAI(temperature=0.1)
 
         memory = ConversationBufferMemory(

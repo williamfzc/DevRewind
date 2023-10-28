@@ -20,6 +20,7 @@ chromadb = "^0.4.14"
 tiktoken = "^0.5.1"
 streamlit = "^1.27.2"
 rapidfuzz = "^3.4.0"
+openai = "^0.28.1"
 
 
 [tool.poetry.group.dev.dependencies]

@@ -1,3 +1,5 @@
+import os
+
 import click
 import time
 
@@ -5,8 +7,8 @@ from dev_rewind import DevRewind
 
 
 @click.command()
-def cli_click():
-    click.echo("welcome to DevRewind")
+def main():
+    click.echo(f"welcome to DevRewind, start preparing data in {os.getcwd()}")
 
     api = DevRewind()
     agent = api.create_agent()
@@ -23,4 +25,4 @@ def cli_click():
 
 
 if __name__ == "__main__":
-    cli_click()
+    main()

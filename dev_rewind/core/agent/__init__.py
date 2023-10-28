@@ -105,14 +105,14 @@ When a user asks something about a file, you should ALWAYS take these steps:
             output_parser=CustomOutputParser(),
         )
 
-        agent = CustomAgentExecutor.from_agent_and_tools(
+        agent_executor = CustomAgentExecutor.from_agent_and_tools(
             agent=chat_agent,
             tools=custom_tools,
             verbose=True,
             memory=memory,
             max_iterations=3,
         )
-        return agent
+        return agent_executor
 
     def create_tools(
         self, runtime_context: RuntimeContext, custom_llm: BaseLLM

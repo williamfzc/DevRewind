@@ -8,7 +8,6 @@ from loguru import logger
 
 from dev_rewind.config import DevRewindConfig, FileLevelEnum
 from dev_rewind.core.context import RuntimeContext, FileContext
-from dev_rewind.core.collector.creator import Creator
 from dev_rewind.exc import DevRewindException
 
 
@@ -28,8 +27,6 @@ class CollectorLayer(object):
         self._collect_files(ctx)
         self._collect_histories(ctx)
 
-        logger.debug("building documentations ...")
-        self._create_docs(ctx)
         logger.debug("metadata ready")
         return ctx
 
@@ -87,7 +84,3 @@ class CollectorLayer(object):
             commits = self._collect_history(git_repo, each_file)
             each_file_ctx.commits = commits
             logger.debug(f"file {each_file} ready")
-
-    def _create_docs(self, ctx: RuntimeContext):
-        creator = Creator()
-        creator.create_doc(ctx)

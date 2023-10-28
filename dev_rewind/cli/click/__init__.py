@@ -8,8 +8,8 @@ from dev_rewind import DevRewind
 def cli_click():
     click.echo("welcome to DevRewind")
 
-    dev_rewind = DevRewind()
-    qa_chain = dev_rewind.create_router_chain()
+    api = DevRewind()
+    agent = api.create_agent()
 
     # avoid the prompt coming faster than log ...
     time.sleep(0.1)
@@ -18,8 +18,8 @@ def cli_click():
         question = click.prompt("Question")
         if question == "exit":
             break
-        output = qa_chain.run(question)
-        click.echo(f"Answer: {output}")
+        response = agent.run(input=question)
+        click.echo(f"Answer: {response}")
 
 
 if __name__ == "__main__":

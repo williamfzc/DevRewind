@@ -7,9 +7,9 @@ st.set_page_config(page_title="DevRewind Bot", page_icon=":robot:")
 
 @st.cache_resource
 def get_model():
-    dev_rewind = DevRewind()
-    qa_chain = dev_rewind.create_router_chain()
-    return qa_chain
+    api = DevRewind()
+    agent = api.create_agent()
+    return agent
 
 
 if "messages" not in st.session_state:
@@ -28,6 +28,6 @@ if prompt := st.chat_input("Start your conversation"):
 
     with st.chat_message("assistant"):
         message_placeholder = st.empty()
-        full_response = model.run(prompt)
+        full_response = model.run(input=prompt)
         message_placeholder.markdown(full_response)
     st.session_state.messages.append((prompt, full_response))

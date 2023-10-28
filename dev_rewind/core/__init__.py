@@ -1,5 +1,5 @@
-from dev_rewind.core.workflow.chain import ChainLayer
+from dev_rewind.core.agent import AgentLayer
 
 
-class DevRewind(ChainLayer):
+class DevRewind(AgentLayer):
     pass

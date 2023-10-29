@@ -9,8 +9,13 @@ from langchain.memory import ConversationBufferMemory
 from langchain.output_parsers.json import parse_json_markdown, parse_partial_json
 from langchain.schema import AgentAction, AgentFinish
 from langchain.tools import BaseTool
+from loguru import logger
 
-from dev_rewind.core.agent.tools import create_keyword_tool
+from dev_rewind.core.agent.tools import (
+    create_keyword_tool,
+    create_file_tool,
+    summarize_commits_with_llm,
+)
 from dev_rewind.core.collector import CollectorLayer
 from dev_rewind.core.context import RuntimeContext
 
@@ -87,6 +92,21 @@ class AgentLayer(CollectorLayer):
             # maybe should be a chat model
             custom_llm = OpenAI(temperature=0.1)
 
+        if self.config.pre_extract:
+            logger.debug("extract keywords before start up")
+            for each_file, each_file_ctx in runtime_context.files.items():
+                # if cache existed, skip
+                # for saving money and time :)
+                existed = runtime_context.cache.read(each_file)
+                if existed:
+                    continue
+
+                keywords = summarize_commits_with_llm(
+                    each_file_ctx.commits, self.config.keyword_limit, custom_llm
+                )
+                runtime_context.cache.create(each_file, keywords)
+            logger.debug("keywords ready")
+
         memory = ConversationBufferMemory(
             memory_key="chat_history", return_messages=True
         )
@@ -96,13 +116,19 @@ class AgentLayer(CollectorLayer):
 You are a codebase analyzer.
 
 - Try more tools for answering.
+- Answer question in user's language.
 - If you don't know the answer, just say that you don't know, don't try to make up an answer.
 
-When a user asks something about a file, you should ALWAYS take these steps:
+When user asks something about a specific file, you should ALWAYS take these steps:
 
-1. Use custom keyword tool for extracting the keywords from the file.
+1. Use `get_keywords_by_file` tool for extracting the keywords from the file.
 2. Deduce the functionality of the file based on keywords and its name.
 3. Finally try to answer the question.
+
+When user asks something about a specific feature/function, you should ALWAYS take these steps:
+
+1. Use `get_files_by_keyword` tool for searching related files.
+2. Try to answer the question.
 """,
             llm=custom_llm,
             tools=custom_tools,
@@ -125,4 +151,5 @@ When a user asks something about a file, you should ALWAYS take these steps:
     ) -> typing.List[BaseTool]:
         return [
             create_keyword_tool(self.config, runtime_context, custom_llm),
+            create_file_tool(runtime_context),
         ]

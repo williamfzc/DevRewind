@@ -10,7 +10,6 @@ from langchain.tools import BaseTool
 from loguru import logger
 from pydantic import BaseModel
 from rapidfuzz import fuzz
-from tinydb import Query
 
 from dev_rewind.config import DevRewindConfig
 from dev_rewind.core.context import RuntimeContext
@@ -18,7 +17,7 @@ from dev_rewind.core.context import RuntimeContext
 
 def summarize_commits_with_llm(
     commits: typing.Iterable[Commit], keyword_limit: int, llm: BaseLLM
-):
+) -> typing.List[str]:
     return summarize_docs_with_llm(
         (Document(page_content=each.message) for each in commits), keyword_limit, llm
     )
@@ -26,7 +25,7 @@ def summarize_commits_with_llm(
 
 def summarize_docs_with_llm(
     docs: typing.Iterable[Document], keyword_limit: int, llm: BaseLLM
-):
+) -> typing.List[str]:
     prompt_template = f"""
 You are a codebase analyzer.
 The following commits comes from git blame of a file:
@@ -46,20 +45,23 @@ Keywords:"""
     stuff_chain = StuffDocumentsChain(
         llm_chain=llm_chain, document_variable_name="text", verbose=True
     )
+    raw_output = stuff_chain.run(docs)
+    possible_json_list: typing.List[str] = parse_partial_json(raw_output)
+    possible_json_list.sort()
+    return possible_json_list
 
-    return stuff_chain.run(docs)
+
+class ToolResponse(BaseModel):
+    ok: bool
+    msg: str
+    data: str = ""
 
 
 def create_keyword_tool(
     config: DevRewindConfig, runtime_context: RuntimeContext, custom_llm: BaseLLM
 ) -> BaseTool:
-    class KeywordResponse(BaseModel):
-        ok: bool
-        msg: str
-        data: str = ""
-
     class KeywordTool(BaseTool):
-        name = "keyword"
+        name = "get_keywords_by_file"
         description = """
 Return keywords of a file for helping index/present this file.
 Always use this if you need to summarize a file.
@@ -83,7 +85,7 @@ It will return:
 
             return best_match, best_similarity
 
-        def _run(self, file_name: str) -> KeywordResponse:
+        def _run(self, file_name: str) -> ToolResponse:
             if file_name not in runtime_context.files:
                 possible_file_name, score = self.find_best_match(
                     file_name, list(runtime_context.files.keys())
@@ -91,7 +93,7 @@ It will return:
                 if score < 80.0:
                     msg = f"all the files did not match {file_name}"
                     logger.warning(msg)
-                    return KeywordResponse(ok=False, msg=msg)
+                    return ToolResponse(ok=False, msg=msg)
                 logger.warning(
                     f"{file_name} seems not a valid git tracked file. Try the most possible one: {possible_file_name}"
                 )
@@ -101,25 +103,48 @@ It will return:
             cached_keywords = runtime_context.cache.read(file_name)
             if cached_keywords:
                 logger.debug(f"found {file_name} 's cache")
-                return KeywordResponse(
+                return ToolResponse(
                     ok=True,
                     msg=f"the real file name should be: {file_name}",
-                    data=cached_keywords,
+                    data=str(cached_keywords),
                 )
 
             # start a chain for summarizing
-            llm_resp = summarize_commits_with_llm(
+            keywords = summarize_commits_with_llm(
                 runtime_context.files[file_name].commits,
                 config.keyword_limit,
                 custom_llm,
             )
-            keywords = parse_partial_json(llm_resp)
             runtime_context.cache.create(file_name, keywords)
 
-            return KeywordResponse(
+            return ToolResponse(
                 ok=True,
                 msg=f"the real file name should be: {file_name}",
                 data=llm_resp,
             )
 
     return KeywordTool()
+
+
+def create_file_tool(runtime_context: RuntimeContext) -> BaseTool:
+    class SearchTool(BaseTool):
+        name = "get_files_by_keyword"
+        description = """
+Receive some keywords as input, and return a file list which related to it. 
+
+It will return:
+- ok: bool, False if no files found
+- msg: extra context for you
+- data: file list
+"""
+        verbose = True
+
+        def _run(self, keywords: typing.List[str]) -> ToolResponse:
+            files = runtime_context.cache.query_files(keywords)
+            return ToolResponse(
+                ok=True,
+                msg="",
+                data=str(files),
+            )
+
+    return SearchTool()

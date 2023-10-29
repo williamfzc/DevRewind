@@ -22,6 +22,7 @@ streamlit = "^1.27.2"
 rapidfuzz = "^3.4.0"
 openai = "^0.28.1"
 tinydb = "^4.8.0"
+sentence-transformers = "^2.2.2"
 
 
 [tool.poetry.group.dev.dependencies]

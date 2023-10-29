@@ -36,9 +36,10 @@ jobs:
           poetry env use ${{ matrix.python-version }}
       - name: Install Dependencies
         run: |
-          poetry add sentence_transformers
+          # special version torch for ci in linux without gpu
           poetry source add -p explicit pytorch https://download.pytorch.org/whl/cpu
           poetry add --source pytorch torch torchvision
+          
           poetry install
       - name: Test
         run: |

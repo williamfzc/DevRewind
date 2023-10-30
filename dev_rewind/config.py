@@ -1,6 +1,6 @@
 from enum import Enum
 
-from pydantic import BaseModel
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class FileLevelEnum(str, Enum):
@@ -13,7 +13,7 @@ class KeywordAlgo(str, Enum):
     BERT: str = "BERT"
 
 
-class DevRewindConfig(BaseModel):
+class DevRewindConfig(BaseSettings):
     repo_root: str = "."
 
     # set it to -1 will query all the commits
@@ -39,3 +39,5 @@ class DevRewindConfig(BaseModel):
     # it really helps to search by features
     # also take some token COST if you're using something like OPENAI, of course
     pre_extract: bool = False
+
+    model_config = SettingsConfigDict(env_prefix="DEVR_")

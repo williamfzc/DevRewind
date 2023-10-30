@@ -25,6 +25,7 @@ tinydb = "^4.8.0"
 sentence-transformers = "^2.2.2"
 jieba = "^0.42.1"
 keybert = "^0.8.3"
+pydantic-settings = "^2.0.3"
 
 
 [tool.poetry.group.dev.dependencies]

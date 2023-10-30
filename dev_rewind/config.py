@@ -8,6 +8,11 @@ class FileLevelEnum(str, Enum):
     DIR: str = "DIR"
 
 
+class KeywordAlgo(str, Enum):
+    LLM: str = "LLM"
+    BERT: str = "BERT"
+
+
 class DevRewindConfig(BaseModel):
     repo_root: str = "."
 
@@ -16,6 +21,10 @@ class DevRewindConfig(BaseModel):
 
     # keyword limit for each file
     keyword_limit: int = 10
+
+    # algo for extracting keywords
+    # use BERT by default because of money
+    keyword_algo: KeywordAlgo = KeywordAlgo.BERT
 
     # file scope
     include_regex: str = ""

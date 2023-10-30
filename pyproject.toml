@@ -23,6 +23,8 @@ rapidfuzz = "^3.4.0"
 openai = "^0.28.1"
 tinydb = "^4.8.0"
 sentence-transformers = "^2.2.2"
+jieba = "^0.42.1"
+keybert = "^0.8.3"
 
 
 [tool.poetry.group.dev.dependencies]

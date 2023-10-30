@@ -1,54 +1,14 @@
 import typing
 
-from git import Commit
-from langchain.chains import LLMChain, StuffDocumentsChain
 from langchain.llms import BaseLLM
-from langchain.output_parsers.json import parse_partial_json
-from langchain.prompts import PromptTemplate
-from langchain.schema import Document
 from langchain.tools import BaseTool
 from loguru import logger
 from pydantic import BaseModel
 from rapidfuzz import fuzz
 
 from dev_rewind.config import DevRewindConfig
+from dev_rewind.core.agent.summary import get_summary_engine
 from dev_rewind.core.context import RuntimeContext
-
-
-def summarize_commits_with_llm(
-    commits: typing.Iterable[Commit], keyword_limit: int, llm: BaseLLM
-) -> typing.List[str]:
-    return summarize_docs_with_llm(
-        (Document(page_content=each.message) for each in commits), keyword_limit, llm
-    )
-
-
-def summarize_docs_with_llm(
-    docs: typing.Iterable[Document], keyword_limit: int, llm: BaseLLM
-) -> typing.List[str]:
-    prompt_template = f"""
-You are a codebase analyzer.
-The following commits comes from git blame of a file:
-
-"{{text}}"
-
-Generate <= {keyword_limit} keywords to represent/predict the features of this file.
-You should only keep the words related to features/business, just ignore something like git operators or verb.
-Response should be a json list.
-Keywords:"""
-    prompt = PromptTemplate.from_template(prompt_template)
-
-    # Define LLM chain
-    llm_chain = LLMChain(llm=llm, prompt=prompt, verbose=True)
-
-    # Define StuffDocumentsChain
-    stuff_chain = StuffDocumentsChain(
-        llm_chain=llm_chain, document_variable_name="text", verbose=True
-    )
-    raw_output = stuff_chain.run(docs)
-    possible_json_list: typing.List[str] = parse_partial_json(raw_output)
-    possible_json_list.sort()
-    return possible_json_list
 
 
 class ToolResponse(BaseModel):
@@ -110,17 +70,19 @@ It will return:
                 )
 
             # start a chain for summarizing
-            keywords = summarize_commits_with_llm(
+            keyword_engine = get_summary_engine(self.config.keyword_algo)
+            keywords = keyword_engine.summarize_commits(
                 runtime_context.files[file_name].commits,
                 config.keyword_limit,
                 custom_llm,
             )
+
             runtime_context.cache.create(file_name, keywords)
 
             return ToolResponse(
                 ok=True,
                 msg=f"the real file name should be: {file_name}",
-                data=llm_resp,
+                data=str(keywords),
             )
 
     return KeywordTool()

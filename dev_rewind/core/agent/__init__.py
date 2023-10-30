@@ -14,8 +14,8 @@ from loguru import logger
 from dev_rewind.core.agent.tools import (
     create_keyword_tool,
     create_file_tool,
-    summarize_commits_with_llm,
 )
+from dev_rewind.core.agent.summary import get_summary_engine
 from dev_rewind.core.collector import CollectorLayer
 from dev_rewind.core.context import RuntimeContext
 
@@ -59,9 +59,12 @@ class CustomOutputParser(AgentOutputParser):
         if not text.endswith("```"):
             text += "`"
 
-        response = parse_json_markdown(text)
-        if response:
-            return self._process_dict(response, text)
+        try:
+            response = parse_json_markdown(text)
+            if response:
+                return self._process_dict(response, text)
+        except JSONDecodeError:
+            pass
 
         # treat it as a raw string
         return AgentFinish({"output": text}, text)
@@ -101,10 +104,13 @@ class AgentLayer(CollectorLayer):
                 if existed:
                     continue
 
-                keywords = summarize_commits_with_llm(
+                keyword_engine = get_summary_engine(self.config.keyword_algo)
+                keywords = keyword_engine.summarize_commits(
                     each_file_ctx.commits, self.config.keyword_limit, custom_llm
                 )
+                logger.debug(f"file {each_file} keywords: {keywords}")
                 runtime_context.cache.create(each_file, keywords)
+
             logger.debug("keywords ready")
 
         memory = ConversationBufferMemory(

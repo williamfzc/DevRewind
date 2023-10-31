@@ -7,7 +7,7 @@ At the current stage, we provide two typical capabilities:
 1. Summarizing the functionality of a specific code file.
 2. Searching for files related to a specific functionality.
 
-In simple terms, our goal is to establish a connection between code and real-world business scenarios and support bidirectional search.
+In simple terms, our goal is to establish a connection between code and real-world business scenarios and support bidirectional search, **without touching the real code**.
 
 ## Example
 

@@ -38,6 +38,6 @@ class DevRewindConfig(BaseSettings):
     # pre-extract keywords before startup if enabled
     # it really helps to search by features
     # also take some token COST if you're using something like OPENAI, of course
-    pre_extract: bool = False
+    pre_extract: bool = True
 
     model_config = SettingsConfigDict(env_prefix="DEVR_")
